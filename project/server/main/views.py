@@ -4,7 +4,8 @@ import redis
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 from rq import Connection, Queue
-from project.server.main.tasks import create_task_harvest
+from project.server.main.tasks import create_task_harvest, is_valid_issn, chunks
+import pandas as pd
 
 default_timeout = 4320000
 
@@ -21,10 +22,19 @@ def run_task_harvest():
     Harvest data
     """
     args = request.get_json(force=True)
-    
-    with Connection(redis.from_url(current_app.config['REDIS_URL'])):
-        q = Queue(name='harvest-issn', default_timeout=default_timeout)
-        task = q.enqueue(create_task_harvest, args)
+    issns = args.get('issns', [])
+    if len(issns) == 0:
+        df = pd.read_json('/upw_data/issn_l', lines=True)
+        issns = [e['journal_issn_l'] for e in df.dropna().to_dict(orient='records') if is_valid_issn(e['journal_issn_l'])]
+
+    issn_chunks = list(chunks(issns, 1000))
+    for ix, issn_chunk in enumerate(issn_chunks):
+        new_args = args.copy()
+        new_args['issns'] = issn_chunk
+        new_args['ix'] = ix
+        with Connection(redis.from_url(current_app.config['REDIS_URL'])):
+            q = Queue(name='harvest-issn', default_timeout=default_timeout)
+            task = q.enqueue(create_task_harvest, new_args)
     response_object = {'status': 'success', 'data': {'task_id': task.get_id()}}
     return jsonify(response_object), 202
 

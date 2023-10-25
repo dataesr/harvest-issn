@@ -18,7 +18,11 @@ def get_issn_html(issn):
             'https': f'{USERNAME}:{PASSWORD}@zproxy.lum-superproxy.io:{PORT}'}))
     #print(f'BRIGHT url = {url}', flush=True)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    source = urllib.request.urlopen(req).read()
+    try:
+        source = urllib.request.urlopen(req).read()
+    except:
+        logger.debug(f'crawl error for {url}')
+        return None
     #source = opener.open(url).read()
     if type(source) == bytes:
         try:
@@ -29,6 +33,8 @@ def get_issn_html(issn):
 
 def harvest(harvest_date, issn):
     source = get_issn_html(issn)
+    if source is None:
+        return None
     current_file = open(f'{issn}.html', 'w')
     current_file.write(source)
     current_file.close()
