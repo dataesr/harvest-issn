@@ -52,6 +52,6 @@ def create_task_harvest(args: dict) -> None:
                     continue
             parsed_issn = parse(source, issn)
             all_parsed.append(parsed_issn)
-    pd.DataFrame(all_parsed).to_json('parsed_issn_{ix}.jsonl', lines=True, orient='records')
-    upload_object('issn', 'parsed_issn_{ix}.jsonl', f'{harvest_date}/parsed/parsed_issn_{ix}.jsonl')
+    pd.DataFrame(all_parsed).to_json(f'parsed_issn_{ix}.jsonl', lines=True, orient='records')
+    upload_object('issn', f'parsed_issn_{ix}.jsonl', f'{harvest_date}/parsed/parsed_issn_{ix}.jsonl')
 
