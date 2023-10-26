@@ -3,7 +3,7 @@ import pandas as pd
 
 from project.server.main.harvest import harvest
 from project.server.main.parse import parse
-from project.server.main.utils_swift import upload_object, download_object
+from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 
 from project.server.main.logger import get_logger
 
@@ -54,4 +54,23 @@ def create_task_harvest(args: dict) -> None:
             all_parsed.append(parsed_issn)
     pd.DataFrame(all_parsed).to_json(f'parsed_issn_{ix}.jsonl', lines=True, orient='records')
     upload_object('issn', f'parsed_issn_{ix}.jsonl', f'{harvest_date}/parsed/parsed_issn_{ix}.jsonl')
+
+def create_task_collect(args):
+    harvest_date = args.get('harvest_date')
+    fr_country = set(['France', 'Guadeloupe', 'Martinique'])
+    all_df = []
+    for ix in range(0, 1000):
+        current_file = f'{harvest_date}/parsed/parsed_issn_{ix}.jsonl'
+        if exists_in_storage( 'issn', current_file):
+            download_object('issn', current_file, f'parsed_issn_{ix}.jsonl')
+            df_tmp = pd.read_json(f'parsed_issn_{ix}.jsonl', lines=True, orient='records')
+            df_tmp_filtered = df_tmp[df_tmp.country.apply(lambda x: isinstance(x, list) and x[0] in fr_country)]
+            logger.debug(f'{len(df_tmp_filtered)} french ISSN in {current_file}')
+            all_df.append(df_tmp_filtered)
+        else:
+            break
+    df = pd.concat(all_df)
+    df.to_jsonl('french_issns.jsonl', lines=True, orient='records')
+    logger.debug(f'{len(df)} french ISSN identified')
+    upload_object('issn', f'french_issns.jsonl', f'{harvest_date}/french_issns.jsonl')
 

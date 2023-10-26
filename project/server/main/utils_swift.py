@@ -26,6 +26,25 @@ init_cmd = f"swift --os-auth-url https://auth.cloud.ovh.net/v3 --auth-version 3 
       --os-project-name {project_name} \
       --os-region-name GRA"
 
+conn = None
+def get_connection() -> swiftclient.Connection:
+    global conn
+    if conn is None:
+        conn = swiftclient.Connection(
+            authurl='https://auth.cloud.ovh.net/v3',
+            user=user,
+            key=key,
+            os_options={
+                'user_domain_name': 'Default',
+                'project_domain_name': 'Default',
+                'project_id': project_id,
+                'project_name': project_name,
+                'region_name': 'GRA'
+            },
+            auth_version='3'
+        )
+    return conn
+
 @retry(delay=3, tries=50, backoff=2)
 def upload_object(container: str, filename: str, destination: str) -> str:
     if destination is None:
@@ -49,3 +68,12 @@ def delete_object(container: str, filename: str) -> None:
     cmd = init_cmd + f' delete {container} {filename}'
     #os.system(cmd)
     r = subprocess.check_output(cmd, shell=True)
+
+@retry(delay=2, tries=50)
+def exists_in_storage(container: str, path: str) -> bool:
+    try:
+        connection = get_connection()
+        connection.head_object(container, path)
+        return True
+    except:
+        return False
