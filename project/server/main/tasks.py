@@ -70,7 +70,7 @@ def create_task_collect(args):
         else:
             break
     df = pd.concat(all_df)
-    df.to_jsonl('french_issns.jsonl', lines=True, orient='records')
+    df.to_json('french_issns.jsonl', lines=True, orient='records')
     logger.debug(f'{len(df)} french ISSN identified')
     upload_object('issn', f'french_issns.jsonl', f'{harvest_date}/french_issns.jsonl')
 
