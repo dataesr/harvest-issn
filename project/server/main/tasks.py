@@ -3,6 +3,7 @@ import pandas as pd
 
 from project.server.main.harvest import harvest
 from project.server.main.parse import parse
+from project.server.main.open_alex import get_volume_from_openalex
 from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 
 from project.server.main.logger import get_logger
@@ -73,4 +74,14 @@ def create_task_collect(args):
     df.to_json('french_issns.jsonl', lines=True, orient='records')
     logger.debug(f'{len(df)} french ISSN identified')
     upload_object('issn', f'french_issns.jsonl', f'{harvest_date}/french_issns.jsonl')
+
+def create_task_enrich(args):
+    harvest_date = args.get('harvest_date')
+    download_object('issn', f'{harvest_date}/french_issns.jsonl', f'french_issns.jsonl')
+    data = pd.read_json(f'french_issns.jsonl', lines=True, orient='records').to_dict(orient='records')
+    for d in data:
+        issn = d.get('issn_l')
+        for year in range(2013, 2025):
+            res = get_volume_from_openalex(issn, year)
+            d.update(res)
 
