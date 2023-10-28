@@ -3,7 +3,8 @@ import pandas as pd
 
 from project.server.main.harvest import harvest
 from project.server.main.parse import parse
-from project.server.main.open_alex import get_volume_from_openalex
+from project.server.main.utils import to_jsonl
+from project.server.main.openalex import get_volume_from_openalex, get_publishers_from_openalex
 from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 
 from project.server.main.logger import get_logger
@@ -79,9 +80,18 @@ def create_task_enrich(args):
     harvest_date = args.get('harvest_date')
     download_object('issn', f'{harvest_date}/french_issns.jsonl', f'french_issns.jsonl')
     data = pd.read_json(f'french_issns.jsonl', lines=True, orient='records').to_dict(orient='records')
-    for d in data:
-        issn = d.get('issn_l')
+    data_enriched = []
+    nb_issn = len(data)
+    for ix, d in enumerate(data):
+        issn = d.get('issn_l')[0]
+        assert(is_valid_issn(issn))
+        publications_info = {'counts': []}
+        logger.debug(f'openalex enrichment for {issn}, {ix}/{nb_issn}')
         for year in range(2013, 2025):
-            res = get_volume_from_openalex(issn, year)
-            d.update(res)
+            publications_info['counts'] += get_volume_from_openalex(issn, year)
+        publications_info['publishers'] = get_publishers_from_openalex(issn)
+        d['publications_info'] = publications_info
+        data_enriched.append(d)
+    to_jsonl(data_enriched, f'french_issns_enriched.jsonl')
+    upload_object('issn', f'french_issns_enriched.jsonl', f'{harvest_date}/french_issns_enriched.jsonl')
 

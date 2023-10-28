@@ -4,7 +4,7 @@ import redis
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 from rq import Connection, Queue
-from project.server.main.tasks import create_task_harvest, is_valid_issn, chunks, create_task_collect
+from project.server.main.tasks import create_task_harvest, is_valid_issn, chunks, create_task_collect, create_task_enrich
 import pandas as pd
 
 default_timeout = 4320000
@@ -47,6 +47,18 @@ def run_task_collect():
     with Connection(redis.from_url(current_app.config['REDIS_URL'])):
         q = Queue(name='harvest-issn', default_timeout=default_timeout)
         task = q.enqueue(create_task_collect, args)
+    response_object = {'status': 'success', 'data': {'task_id': task.get_id()}}
+    return jsonify(response_object), 202
+
+@main_blueprint.route('/enrich', methods=['POST'])
+def run_task_enrich():
+    """
+    Enrich data
+    """
+    args = request.get_json(force=True)
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])):
+        q = Queue(name='harvest-issn', default_timeout=default_timeout)
+        task = q.enqueue(create_task_enrich, args)
     response_object = {'status': 'success', 'data': {'task_id': task.get_id()}}
     return jsonify(response_object), 202
 
