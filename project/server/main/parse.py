@@ -27,7 +27,7 @@ field_names = {
     'ISSN Center responsible of the record:': 'responsible_issn_center'
 }
 
-def parse(source, input_issn):
+def parse_issn(source, input_issn):
     soup = BeautifulSoup(source, 'lxml')
     res = {'input_issn': input_issn, 'the_keepers': False, 'road': False, 'in_mirabel': False}
     for item_result in soup.find_all(class_='item-result-content-text'):
