@@ -56,7 +56,7 @@ def upload_object(container: str, filename: str, destination: str) -> str:
     r = subprocess.check_output(cmd, shell=True)
     return f'https://storage.gra.cloud.ovh.net/v1/AUTH_{project_id}/{container}/{destination}'
 
-@retry(delay=3, tries=50, backoff=2)
+@retry(delay=3, tries=2, backoff=2)
 def download_object(container: str, filename: str, out: str) -> None:
     logger.debug(f'Downloading {filename} from {container} to {out}')
     cmd = init_cmd + f' download {container} {filename} -o {out}'

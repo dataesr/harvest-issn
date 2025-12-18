@@ -1,7 +1,9 @@
 import os
 import sys
 import pandas as pd
+import requests
 from urllib import parse
+import json
 
 from project.server.main.harvest import harvest
 from project.server.main.parse import parse_issn
@@ -9,6 +11,7 @@ from project.server.main.utils import to_jsonl
 from project.server.main.openalex import get_volume_from_openalex, get_publishers_from_openalex
 from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 from project.server.main.elastic import reset_index
+from project.server.main.ef import compute_ef
 
 from project.server.main.logger import get_logger
 
@@ -17,6 +20,13 @@ logger = get_logger(__name__)
 ES_LOGIN_BSO_BACK = os.getenv('ES_LOGIN_BSO_BACK', '')
 ES_PASSWORD_BSO_BACK = os.getenv('ES_PASSWORD_BSO_BACK', '')
 ES_URL = os.getenv('ES_URL', 'http://localhost:9200')
+
+
+def create_task_tmp(args):
+    data = pd.read_csv('/src/project/server/main/text.csv').to_dict(orient='records')
+    x = compute_ef(data)
+    json.dump(x, open(f'/upw_data/text_ef.json', 'w'))
+
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -47,8 +57,8 @@ def create_task_harvest(args: dict) -> None:
     all_parsed = []
     for issn in issns:
         source = None
-        if args.get('download', True):
-            source = harvest(harvest_date, issn)
+        #if args.get('download', True):
+        #    source = harvest(harvest_date, issn)
         if args.get('parse', True):
             if source is None:
                 try:
@@ -58,7 +68,7 @@ def create_task_harvest(args: dict) -> None:
                     current_file.close()
                     os.system(f'rm -rf {issn}.html')
                 except:
-                    continue
+                    source = harvest(harvest_date, issn)
             parsed_issn = parse_issn(source, issn)
             all_parsed.append(parsed_issn)
     pd.DataFrame(all_parsed).to_json(f'parsed_issn_{ix}.jsonl', lines=True, orient='records')
