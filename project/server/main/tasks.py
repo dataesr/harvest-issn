@@ -12,7 +12,7 @@ from project.server.main.openalex import get_volume_from_openalex, get_publisher
 from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 from project.server.main.elastic import reset_index
 from project.server.main.ef import compute_ef
-
+from project.server.main.mirabel import parse_all_mirabel, get_mirabel_for_ids
 from project.server.main.logger import get_logger
 
 logger = get_logger(__name__)
@@ -45,6 +45,14 @@ def is_valid_issn(x):
     for e in ['.', '*']:
         assert(e not in x)
     return True
+
+def create_task_mirabel(args):
+    df = pd.read_csv('liste_revue.csv')
+    revue_ids = list(set(df.id_revue.to_list()))
+    if args.get('download', False):
+        get_mirabel_for_ids(revue_ids)
+    parse_all_mirabel()
+    import_es('/upw_data/mirabel/parsed.jsonl', 'bso-revues-test')
 
 def create_task_harvest(args: dict) -> None:
     harvest_date = args.get('harvest_date')
@@ -123,10 +131,10 @@ def create_task_enrich(args):
                     d[f] = d[f][0]
             new_data.append(d)
         to_jsonl(new_data, f'french_issns_enriched_to_load.jsonl')
-        import_es(f'bso-issn-{harvest_date}')
+        import_es('french_issns_enriched_to_load.jsonl', f'bso-issn-{harvest_date}')
 
-def import_es(index_name):
-    input_file = f'french_issns_enriched_to_load.jsonl'
+def import_es(input_file, index_name):
+    #input_file = f'french_issns_enriched_to_load.jsonl'
     es_url_without_http = ES_URL.replace('https://','').replace('http://','')
     es_host = f'https://{ES_LOGIN_BSO_BACK}:{parse.quote(ES_PASSWORD_BSO_BACK)}@{es_url_without_http}'
     logger.debug('loading bso-issn index')
