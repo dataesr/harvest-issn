@@ -9,7 +9,7 @@ from project.server.main.logger import get_logger
 
 logger = get_logger(__name__)
 
-@retry(delay=300, tries=5, logger=logger)
+@retry(delay=100, tries=5, logger=logger)
 def get_mirabel_infos(revue_id):
     url = f"https://reseau-mirabel.info/api/revues/{revue_id}"
     res = requests.get(url).json()
@@ -43,7 +43,11 @@ def parse_mirabel(notice):
     titre = titres[0]
     for f in ['url', 'periodicite', 'langues', 'editeurs', 'titre', 'sigle', 'datedebut', 'datefin', 'issns', 'labellisation']:
         if titre.get(f):
-            res[f] = titre[f]
+            if f in ['datedebut', 'datefin']:
+                if isinstance(titre[f], str) and len(titre[f])>=4:
+                    res[f] = titre[f][0:4]
+            else:
+                res[f] = titre[f]
     liensext = titre.get('liensext')
     platforms = ['ddh', 'doaj', 'openalex', 'scopus', 'wos', 'hal']
     for p in platforms:
