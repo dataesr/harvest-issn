@@ -52,7 +52,8 @@ def create_task_mirabel(args):
     if args.get('download', False):
         get_mirabel_for_ids(revue_ids)
     parse_all_mirabel()
-    import_es('/upw_data/mirabel/parsed.jsonl', 'bso-revues-test')
+    index_name = args.get('bso-revues-test')
+    import_es('/upw_data/mirabel/parsed.jsonl', index_name)
 
 def create_task_harvest(args: dict) -> None:
     harvest_date = args.get('harvest_date')

@@ -45,27 +45,15 @@ def parse_mirabel(notice):
         if titre.get(f):
             res[f] = titre[f]
     liensext = titre.get('liensext')
-    for t in ['ddh', 'doaj', 'openalex', 'scopus', 'wos', 'hal']:
-        res[f'infos_{t}'] = {f'is_in_{t}': False} 
+    platforms = ['ddh', 'doaj', 'openalex', 'scopus', 'wos', 'hal']
+    for p in platforms:
+        res[f'infos_{p}'] = {f'is_in_{p}': False} 
     if isinstance(liensext, list):
         for i in liensext:
             if len(i)==2:
-                if i[1] == 'DDH':
-                    res['infos_ddh']['is_in_ddh'] = True
-                    res['infos_ddh']['url'] = i[0]
-                if i[1] == 'DOAJ':
-                    res['infos_doaj']['is_in_doah'] = True
-                    res['infos_doaj']['url'] = i[0]
-                if i[1] == 'HAL':
-                    res['infos_hal']['is_in_hal'] = True
-                    res['infos_hal']['url'] = i[0]
-                if i[1] == 'OpenAlex':
-                    res['infos_openalex']['is_in_openalex'] = True
-                    res['infos_openalex']['url'] = i[0]
-                if i[1] == 'WOS':
-                    res['infos_wos']['is_in_wos'] = True
-                    res['infos_wos']['url'] = i[0]
-                if i[1] == 'SCOPUS':
-                    res['infos_scopus']['is_in_scopus'] = True
-                    res['infos_scopus']['url'] = i[0]
+                platform = i[1].lower().replace(' ', '_').strip()
+                for p in platforms:
+                    if platform == p:
+                        res[f'infos_{p}'][f'is_in_{p}'] = True
+                        res[f'infos_{p}']['url'] = i[0]
     return res
