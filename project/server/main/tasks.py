@@ -7,12 +7,12 @@ import json
 
 from project.server.main.harvest import harvest
 from project.server.main.parse import parse_issn
-from project.server.main.utils import to_jsonl
+from project.server.main.utils import to_jsonl, chunks
 from project.server.main.openalex import get_volume_from_openalex, get_publishers_from_openalex
 from project.server.main.utils_swift import upload_object, download_object, exists_in_storage
 from project.server.main.elastic import reset_index
 from project.server.main.ef import compute_ef
-from project.server.main.mirabel import parse_all_mirabel, get_mirabel_for_ids
+from project.server.main.mirabel import get_mirabel_dump, parse_all_mirabel, get_mirabel_for_ids, get_bso_local_mirabel
 from project.server.main.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,11 +28,6 @@ def create_task_tmp(args):
     json.dump(x, open(f'/upw_data/text_ef.json', 'w'))
 
 
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
-
 def is_valid_issn(x):
     if not isinstance(x, str):
         return False
@@ -47,13 +42,17 @@ def is_valid_issn(x):
     return True
 
 def create_task_mirabel(args):
-    df = pd.read_csv('liste_revue.csv')
-    revue_ids = list(set(df.id_revue.to_list()))
-    if args.get('download', False):
-        get_mirabel_for_ids(revue_ids)
-    parse_all_mirabel()
+    #df = pd.read_csv('liste_revue.csv')
+    #revue_ids = list(set(df.id_revue.to_list()))
+    #if args.get('download', False):
+    #    get_mirabel_for_ids(revue_ids)
+    #parse_all_mirabel()
+    mirabel_dump = get_mirabel_dump()
     index_name = args.get('index_name', 'bso-revues-test')
-    import_es('/upw_data/mirabel/parsed.jsonl', index_name)
+    if args.get('revues'):
+        import_es('/upw_data/mirabel/mirabel.jsonl', index_name)
+    if args.get('publications'):
+        get_bso_local_mirabel(mirabel_dump)
 
 def create_task_harvest(args: dict) -> None:
     harvest_date = args.get('harvest_date')

@@ -3,11 +3,56 @@ import os
 import requests
 import pandas as pd
 from project.server.main.utils import to_jsonl
+from project.server.main.mongo import get_doi_from_issn
+from project.server.main.utils import chunks
+from project.server.main.utils_swift import upload_object, download_object
 from retry import retry
 
 from project.server.main.logger import get_logger
 
 logger = get_logger(__name__)
+
+MIRABEL_API_KEY = os.getenv('MIRABEL_API_KEY')
+
+@retry(delay=100, tries=5, logger=logger)
+def get_mirabel_dump():
+    df = pd.read_json(f'https://reseau-mirabel.info/grappe/export?dest=bso&api-key={MIRABEL_API_KEY}', compression='gzip')
+    logger.debug(f"{len(df.titres)} titres récupérés dans Mirabel")
+    mirabel_data = df.titres.to_list()
+    to_jsonl(mirabel_data, '/upw_data/mirabel/mirabel.jsonl')
+    return {'update': df.miseajour.max(), 'data': df.titres.to_list()}
+
+def get_issns(d):
+    issns = []
+    if isinstance(d.get('identifiants'), dict):
+        for f in ['issne', 'issnp', 'issnl']:
+            if d['identifiants'].get(f):
+                assert(isinstance(d['identifiants'][f], str))
+                issns.append(d['identifiants'][f])
+    return list(set(issns))
+
+def get_all_issns(mirabel_dump):
+    issns = []
+    for d in mirabel_dump['data']:
+        issns += get_issns(d)
+    issns = list(set(issns))
+    logger.debug(f"{len(issns)} issns found")
+    return issns
+
+def get_bso_local_mirabel(mirabel_dump):
+    all_issns = get_all_issns(mirabel_dump)
+    issn_chunks = chunks(all_issns, 50)
+    all_dois = []
+    for issn_chunk in issn_chunks:
+        dois = [k['doi'] for k in get_doi_from_issn(issn_chunk) if k.get('doi')]
+        logger.debug(f"got {len(dois)} DOIs for a chunk of {len(issn_chunk)} ISSNs")
+        all_dois += list(set(dois))
+    all_dois = list(set(all_dois))
+    logger.debug(f"total {len(all_dois)} retrievied for the {len(all_issns)} ISSNs")
+    bso_local_data = [{'doi': doi, 'bso_country': 'other'} for doi in all_dois]
+    pd.DataFrame(bso_local_data).to_csv('bsoedition.csv', index=False)
+    # uploading to bso_local bucket
+    upload_object('bso_local', f'bsoedition.csv', f'bsoedition.csv')
 
 @retry(delay=100, tries=5, logger=logger)
 def get_mirabel_infos(revue_id):
