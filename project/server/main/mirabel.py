@@ -52,7 +52,7 @@ def get_bso_local_mirabel(mirabel_dump):
     bso_local_data = [{'doi': doi, 'bso_country': 'other'} for doi in all_dois]
     pd.DataFrame(bso_local_data).to_csv('bsoedition.csv', index=False)
     # uploading to bso_local bucket
-    upload_object('bso_local', f'bsoedition.csv', f'bsoedition.csv')
+    upload_object('bso-local', f'bsoedition.csv', f'bsoedition.csv')
 
 @retry(delay=100, tries=5, logger=logger)
 def get_mirabel_infos(revue_id):
