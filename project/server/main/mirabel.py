@@ -7,29 +7,75 @@ from project.server.main.mongo import get_doi_from_issn
 from project.server.main.utils import chunks
 from project.server.main.utils_swift import upload_object, download_object
 from retry import retry
-
 from project.server.main.logger import get_logger
 
 logger = get_logger(__name__)
 
 MIRABEL_API_KEY = os.getenv('MIRABEL_API_KEY')
 
+#theme
+#https://reseau-mirabel.info/api/themes/grappe/89
+
 @retry(delay=100, tries=5, logger=logger)
 def get_mirabel_dump():
     df = pd.read_json(f'https://reseau-mirabel.info/grappe/export?dest=bso&api-key={MIRABEL_API_KEY}', compression='gzip')
     logger.debug(f"{len(df.titres)} titres récupérés dans Mirabel")
     mirabel_data = df.titres.to_list()
-    to_jsonl(mirabel_data, '/upw_data/mirabel/mirabel.jsonl')
+    revue_map = {}
+    for d in mirabel_data:
+        if d['revueid'] not in revue_map:
+            revue_map[d['revueid']] = []
+        revue_map[d['revueid']].append(d)
+    revues_data = []
+    for r in revue_map:
+        try:
+            revue_map[r].sort(key=lambda x:x['dates']['debut'], reverse=True) # plus récente en premier
+        except:
+            revue_map[r].sort(key=lambda x:x['titreid'], reverse=True) # plus recent en premier
+        current_revue = {}
+        # à partir de la plus recente
+        for f in ['revueid', 'titre', 'sigle', 'siteweb', 'periodicite', 'langues']:
+            current_revue[f] = revue_map[r][0].get(f)
+        current_revue['issns'] = []
+        current_revue['titres'] = []
+        liens = {}
+        min_date = 9999
+        for revue in revue_map[r]:
+            if revue.get('dates') and revue['dates'].get('debut'):
+                min_date = min(min_date, int(revue['dates'].get('debut')[0:4]))
+            current_revue['titres'].append(revue['titreid'])
+            ident = revue['identifiants']
+            for k in ['issne', 'issnp', 'issnl']:
+                if ident.get(k) and ident.get(k) not in current_revue['issns']:
+                    current_revue['issns'].append(ident.get(k))
+            for k in revue.get('liens'):
+                if revue['liens'][k]:
+                    liens[k] = True
+        current_revue['dates'] = {'debut': None}
+        if min_date != 9999:
+            current_revue['dates'] = {'debut': str(min_date)}
+        current_revue['dates']['fin'] = revue_map[r][0]['dates']['fin']
+        current_revue['liens'] = liens
+        current_revue['wikipedia'] = {}
+        for k in liens:
+            if 'wikipedia'in k.lower() and liens[k]:
+                lang = k.split('-')[-1]
+                language = get_lang(lang)
+                current_revue['wikipedia'][language] = True
+        revues_data.append(current_revue)
+    os.system('rm -rf /upw_data/mirabel/mirabel.jsonl')
+    to_jsonl(revues_data, '/upw_data/mirabel/mirabel.jsonl')
     return {'update': df.miseajour.max(), 'data': df.titres.to_list()}
 
 def get_issns(d):
-    issns = []
-    if isinstance(d.get('identifiants'), dict):
-        for f in ['issne', 'issnp', 'issnl']:
-            if d['identifiants'].get(f):
-                assert(isinstance(d['identifiants'][f], str))
-                issns.append(d['identifiants'][f])
-    return list(set(issns))
+    return d.get('issns', [])
+    #issns = []
+    #if isinstance(d.get('identifiants'), dict):
+    #    for f in ['issne', 'issnp', 'issnl']:
+    #        if d['identifiants'].get(f):
+    #            assert(isinstance(d['identifiants'][f], str))
+    #            issns.append(d['identifiants'][f])
+    #return list(set(issns))
 
 def get_all_issns(mirabel_dump):
     issns = []
@@ -106,3 +152,37 @@ def parse_mirabel(notice):
                         res[f'infos_{p}'][f'is_in_{p}'] = True
                         res[f'infos_{p}']['url'] = i[0]
     return res
+
+def get_lang(code: str) -> str:
+    """
+    Convertit un code langue Wikipédia ('fr', 'en', 'de', ...)
+    en nom de langue en français.
+    """
+    languages = {
+        "fr": "français",
+        "en": "anglais",
+        "de": "allemand",
+        "es": "espagnol",
+        "it": "italien",
+        "pt": "portugais",
+        "nl": "néerlandais",
+        "ru": "russe",
+        "zh": "chinois",
+        "ja": "japonais",
+        "ko": "coréen",
+        "ar": "arabe",
+        "pl": "polonais",
+        "sv": "suédois",
+        "uk": "ukrainien",
+        "cs": "tchèque",
+        "tr": "turc",
+        "he": "hébreu",
+        "fi": "finnois",
+        "no": "norvégien",
+        "da": "danois",
+        "el": "grec",
+        "hu": "hongrois",
+        "ro": "roumain",
+        "ca": "catalan",
+    }
+    return languages.get(code.lower(), f"langue inconnue ({code})")
