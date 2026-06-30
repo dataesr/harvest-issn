@@ -39,6 +39,7 @@ def get_mirabel_dump():
         current_revue['issns'] = []
         current_revue['titres'] = []
         liens = {}
+        wikipedia = {}
         min_date = 9999
         for revue in revue_map[r]:
             if revue.get('dates') and revue['dates'].get('debut'):
@@ -51,21 +52,23 @@ def get_mirabel_dump():
             for k in revue.get('liens'):
                 if revue['liens'][k]:
                     liens[k] = True
+            for k in revue.get('wikipedia'):
+                if k:
+                    wikipedia[k] = True
         current_revue['dates'] = {'debut': None}
         if min_date != 9999:
             current_revue['dates'] = {'debut': str(min_date)}
         current_revue['dates']['fin'] = revue_map[r][0]['dates']['fin']
         current_revue['liens'] = liens
         current_revue['wikipedia'] = {}
-        for k in liens:
-            if 'wikipedia'in k.lower() and liens[k]:
-                lang = k.split('-')[-1]
-                language = get_lang(lang)
-                current_revue['wikipedia'][language] = True
+        for k in wikipedia:
+            lang = k.replace('https://', '').split('.')[0]
+            language = get_lang(lang)
+            current_revue['wikipedia'][language] = True
         revues_data.append(current_revue)
     os.system('rm -rf /upw_data/mirabel/mirabel.jsonl')
     to_jsonl(revues_data, '/upw_data/mirabel/mirabel.jsonl')
-    return {'update': df.miseajour.max(), 'data': df.titres.to_list()}
+    return {'update': df.miseajour.max(), 'data': revues_data}
 
 def get_issns(d):
     return d.get('issns', [])
@@ -184,5 +187,23 @@ def get_lang(code: str) -> str:
         "hu": "hongrois",
         "ro": "roumain",
         "ca": "catalan",
+        "fa": "persan",
+    "oc": "occitan",
+    "az": "azéri",
+    "gl": "galicien",
+    "la": "latin",
+    "bg": "bulgare",
+    "br": "breton",
+    "et": "estonien",
+    "is": "islandais",
+    "ms": "malais",
+    "sl": "slovène",
+    "ta": "tamoul",
+    "uz": "ouzbek",
+    "eu": "basque",
+    "eo": "espéranto",
+    "id": "indonésien",
+    "ig": "igbo",
+    "ha": "haoussa",
     }
     return languages.get(code.lower(), f"langue inconnue ({code})")
